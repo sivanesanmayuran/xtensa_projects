@@ -1,0 +1,882 @@
+regfile REG_SIMD 128 4 sv
+
+function [31:0] ADD32([31:0] a, [15:0] b) slot_shared
+{
+    assign ADD32 = TIEadd(a, b, 1'b0);
+}
+//function [63:0]TIEfadd ([63:0] a, [63:0] b)
+//{
+//	wire [7:0]p;
+//}
+
+queue QO 32 out
+queue QI 32 in
+regfile qbuffer 128 2 qb
+operation RECV {out qbuffer buffer}{in QI}{assign buffer = QI;}
+
+operation SEND {in qbuffer buffer}{out QO}
+{
+
+	assign QO = fnc_erode(buffer);
+}
+
+function [31:0] fnc_erode([127:0] buffer)
+{
+	wire [7:0] in1 =  buffer[7:0];
+    wire [7:0] in2 =  buffer[15:8];
+    wire [7:0] in3 =  buffer[23:16];
+    wire [7:0] in4 =  buffer[31:24];
+    wire [7:0] in5 =  buffer[39:32];
+    wire [7:0] in6 =  buffer[47:40];
+    wire [7:0] in7 =  buffer[55:48];
+    wire [7:0] in8 =  buffer[63:56];
+	wire [7:0] in9 =  buffer[71:64];
+	wire [7:0] in10 = buffer[79:72];
+	wire [7:0] in11 = buffer[87:80];
+	wire [7:0] in12 = buffer[95:88];
+	wire [7:0] in13 = buffer[103:96];
+	wire [7:0] in14 = buffer[111:104];
+	wire [7:0] in15 = buffer[119:112];
+	wire [7:0] in16 = buffer[127:120];	
+	
+	wire [15:0] add1 = TIEaddn(in1,in2,in3,in5,in6,in7,in9,in10,in11);
+	wire [7:0] res1 = (add1 > 16'b0) ? 8'b0 : 8'b11111111;
+	wire [15:0] add2 = TIEaddn(in4,in2,in3,in8,in6,in7,in12,in10,in11);
+	wire [7:0] res2 = (add2 > 16'b0) ? 8'b0 : 8'b11111111;
+	wire [15:0] add3 = TIEaddn(in5,in6,in7,in9,in10,in11,in13,in14,in15);
+	wire [7:0] res3 = (add3 > 16'b0) ? 8'b0 : 8'b11111111;
+	wire [15:0] add4 = TIEaddn(in8,in6,in7,in12,in10,in11,in14,in15,in16);
+	wire [7:0] res4 = (add4 > 16'b0) ? 8'b0 : 8'b11111111;
+	assign fnc_erode = {res1,res2,res3,res4};
+}
+
+function [127:0] func_mul4 ([63:0] multiplier, [63:0] multiplicand,do_signed)
+{
+	//4 way SIMD multiplier
+	wire [31:0] prod0 = TIEmul(multiplier[15:0], multiplicand[15:0],do_signed);
+	wire [31:0] prod1 = TIEmul(multiplier[31:16], multiplicand[31:16],do_signed);
+	wire [31:0] prod2 = TIEmul(multiplier[47:32], multiplicand[47:32],do_signed);
+	wire [31:0] prod3 = TIEmul(multiplier[63:48], multiplicand[63:48],do_signed);
+	assign func_mul4 = {prod0, prod1, prod2, prod3};
+}
+function [127:0] func_add4 ([63:0] multiplier, [63:0] multiplicand,do_signed)
+{
+	//4 way SIMD adder
+	wire [31:0] prod0 = TIEadd(multiplier[15:0], multiplicand[15:0],do_signed);
+	wire [31:0] prod1 = TIEadd(multiplier[31:16], multiplicand[31:16],do_signed);
+	wire [31:0] prod2 = TIEadd(multiplier[47:32], multiplicand[47:32],do_signed);
+	wire [31:0] prod3 = TIEadd(multiplier[63:48], multiplicand[63:48],do_signed);
+	assign func_add4 = {prod0, prod1, prod2, prod3};
+}
+function [127:0] func_load4 ([63:0] multiplier)
+{
+	//4 way SIMD adder
+	wire [31:0] prod0 = multiplier[15:0];
+	wire [31:0] prod1 = multiplier[31:16];
+	wire [31:0] prod2 = multiplier[47:32];
+	wire [31:0] prod3 = multiplier[63:48];
+	assign func_load4 = {prod0, prod1, prod2, prod3};
+}
+operation SIMD_OPERATION {in AR op_code, in REG_SIMD dataA,in REG_SIMD dataB,out REG_SIMD result_data} {}
+{         
+	wire [127:0] result = (op_code==2'b00) ? func_add4(dataA,dataB,1'b0) : (op_code==2'b01) ? func_mul4(dataA,dataB,1'b0) : func_load4(dataB);
+	assign result_data = result;
+}
+
+operation SIMD_LOAD {in AR *base, in AR offset, out REG_SIMD data} {out VAddr, in MemDataIn128}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = MemDataIn128[7:0];
+    wire [7:0] o2 = MemDataIn128[15:8];
+    wire [7:0] o3 = MemDataIn128[23:16];
+    wire [7:0] o4 = MemDataIn128[31:24];
+    wire [7:0] o5 = MemDataIn128[39:32];
+    wire [7:0] o6 = MemDataIn128[47:40];
+    wire [7:0] o7 = MemDataIn128[55:48];
+    wire [7:0] o8 = MemDataIn128[63:56];
+	wire [7:0] o9 = MemDataIn128[71:64];
+	wire [7:0] o10 = MemDataIn128[79:72];
+	wire [7:0] o11 = MemDataIn128[87:80];
+	wire [7:0] o12 = MemDataIn128[95:88];
+	wire [7:0] o13 = MemDataIn128[103:96];
+	wire [7:0] o14 = MemDataIn128[111:104];
+	wire [7:0] o15 = MemDataIn128[119:112];
+	wire [7:0] o16 = MemDataIn128[127:120];
+    assign data = {o1, o2, o3, o4, o5, o6, o7, o8 ,o9, o10, o11, o12, o13, o14, o15, o16};
+}
+operation SIMD_STORE {in AR *base, in AR offset, in REG_SIMD data} {out VAddr, out MemDataOut128}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = data[7:0];
+    wire [7:0] o2 = data[15:8];
+    wire [7:0] o3 = data[23:16];
+    wire [7:0] o4 = data[31:24];
+    wire [7:0] o5 = data[39:32];
+    wire [7:0] o6 = data[47:40];
+    wire [7:0] o7 = data[55:48];
+    wire [7:0] o8 = data[63:56];
+    wire [7:0] o9 = data[71:64];
+    wire [7:0] o10 = data[79:72];
+    wire [7:0] o11 = data[87:80];
+    wire [7:0] o12 = data[95:88];
+    wire [7:0] o13 = data[103:96];
+    wire [7:0] o14 = data[111:104];
+    wire [7:0] o15 = data[119:112];
+    wire [7:0] o16 = data[127:120];
+
+    assign MemDataOut128 = {o1, o2, o3, o4, o5, o6, o7, o8 ,o9, o10, o11, o12, o13, o14, o15, o16};
+}
+
+
+//Facing some load error VAddr multiple assignment. Need to fix????
+//operation SIMD_WLOAD {in AR *base, in AR offset, out REG_SIMD data} {out VAddr, in MemDataIn32}
+//{
+//    assign VAddr = base;
+//    wire [31:0] o1 = MemDataIn32;
+//    assign VAddr = TIEadd(base, offset, 1'b0);
+//    wire [31:0] o2 = MemDataIn32;
+//    assign VAddr = TIEaddn(base, offset,offset, 1'b0);
+//    wire [31:0] o3 = MemDataIn32;
+//    assign VAddr = TIEaddn(base, offset,offset,offset, 1'b0);
+//    wire [31:0] o4 = MemDataIn32;
+//    assign data = {o1, o2, o3, o4};
+//}
+
+//Facing some slot error??? Need to fix : slot_shared
+operation RGB2YUV {in AR rgb, out AR y,out AR u,out AR v} {}
+{
+	wire [7:0] r = rgb[7:0];
+	wire [7:0] g = rgb[15:8];
+	wire [7:0] b = rgb[23:16];
+	
+	wire [63:0] y1 = TIEmul (299,r,1'b0);
+	wire [63:0] y2 = TIEmul(587,g,1'b0 );
+	wire [63:0] y3 = TIEmul(114,b,1'b0 );
+	wire [63:0] Y_b = TIEaddn(y1,y2 ,y3 );
+	
+	wire [63:0] u1 = TIEmul(500,b,1'b0 );
+	wire [63:0] u2 = TIEmul(169,r,1'b0 );
+	wire [63:0] u3 = TIEmul(331,g,1'b0 );
+	wire [63:0] U_b = TIEaddn(u1,u2,u3);
+	
+	wire [63:0] v1 = TIEmul(500,r,1'b0 );
+	wire [63:0] v2 = TIEmul(419,g,1'b0 ); 
+	wire [63:0] v3 = TIEmul(81,b,1'b0 );
+	wire [63:0] V_b= TIEaddn(v1,v2,v3);
+	
+	assign y = Y_b[63:32];
+	assign u = U_b[63:32];
+	assign v = V_b[63:32];
+	//Floaing point support?? can be used the existing??
+}
+
+/*operation MAC {in REG_SIMD fr , in REG_SIMD fi , out AR val} {}
+{
+	wire [15:0] res0 = TIEmul (fr [7:0] , fi [7:0] , 1'b0 );
+	wire [15:0] res1 = TIEmul (fr [15:8] , fi [15:8] , 1'b0 );
+	wire [15:0] res2 = TIEmul (fr [23:16] , fi [23:16] , 1'b0 );
+	wire [15:0] res3 = TIEmul (fr [31:24] , fi [31:24] , 1'b0 );
+	wire [15:0] res4 = TIEmul (fr [39:32] , fi [39:32] , 1'b0 );
+	wire [15:0] res5 = TIEmul (fr [47:40] , fi [47:40] , 1'b0 );
+	wire [15:0] res6 = TIEmul (fr [55:48] , fi [55:48] , 1'b0 );
+	wire [15:0] res7 = TIEmul (fr [63:56] , fi [63:56] , 1'b0 );
+	wire [15:0] res8 = TIEmul (fr [71:64] , fi [71:64] , 1'b0 );
+	assign val = TIEaddn (res0 ,res1 ,res2 ,res3 ,res4 ,res5 ,res6 ,res7 , res8 );
+}*/
+
+operation SWAP {in AR input , out AR val} {}
+{
+	wire [7:0] res0 = input [7:0];
+	wire [7:0] res1 = input [15:8];
+
+	assign val = {res0 ,res1};
+}
+operation SIMD_MAC {in REG_SIMD fr, in REG_SIMD fi, out REG_SIMD val} {}
+{
+	wire [15:0] res1 = 	TIEmul(fr[7:0], fi[7:0], 1'b0);//bug in fi<-needto adjust the range bcos 9 values only
+	wire [15:0] res2 =  TIEmul(fr[15:8], fi[15:8], 1'b0);
+	wire [15:0] res3 =  TIEmul(fr[23:16], fi[23:16], 1'b0);
+	wire [15:0] res4 =  TIEmul(fr[31:24], fi[31:24], 1'b0);
+	wire [15:0] res5 =  TIEmul(fr[39:32], fi[39:32], 1'b0);
+	wire [15:0] res6 =  TIEmul(fr[47:40], fi[47:40], 1'b0);
+	wire [15:0] res7 =  TIEmul(fr[55:48], fi[55:48], 1'b0);
+	wire [15:0] res8 =  TIEmul(fr[63:56], fi[63:56], 1'b0);
+	wire [15:0] res9 =  TIEmul(fr[71:64], fi[71:64], 1'b0);
+	wire [15:0] res10 = TIEmul(fr[79:72], fi[79:72], 1'b0);
+	wire [15:0] res11 = TIEmul(fr[87:80], fi[87:80], 1'b0);
+	wire [15:0] res12 = TIEmul(fr[95:88], fi[95:88], 1'b0);
+	wire [15:0] res13 = TIEmul(fr[103:96], fi[103:96], 1'b0);
+	wire [15:0] res14 = TIEmul(fr[111:104], fi[111:104], 1'b0);
+	wire [15:0] res15 = TIEmul(fr[119:112], fi[119:112], 1'b0);
+	wire [15:0] res16 = TIEmul(fr[127:120], fi[127:120], 1'b0);
+	
+	wire [31:0] val1  =  TIEaddn(res1,res2,res3,res5,res6,res7,res9,res10,res11); 
+	wire [31:0] val2  =  TIEaddn(res2,res3,res4,res6,res7,res8,res10,res11,res12); 
+	wire [31:0] val3  =  TIEaddn(res5,res6,res7,res9,res10,res11,res13,res14,res15); 
+	wire [31:0] val4  =  TIEaddn(res6,res7,res8,res10,res11,res12,res14,res15,res16);
+	
+	assign val  =  {val1,val2,val3,val4}; 
+}
+
+
+operation SIMD_MAG8 {in REG_SIMD fr, in REG_SIMD fi, out REG_SIMD data} {}
+{
+	wire [15:0] res0_r = TIEmul(fr[7:0], fr[7:0], 1'b0);
+	wire [15:0] res0_i = TIEmul(fi[7:0], fi[7:0], 1'b0);
+	wire [15:0] res0   = TIEadd(res0_r,res0_i,1'b0);
+	
+	wire [15:0] res1_r = TIEmul(fr[15:8], fr[15:8], 1'b0);
+	wire [15:0] res1_i = TIEmul(fi[15:8], fi[15:8], 1'b0);
+	wire [15:0] res1   = TIEadd(res1_r,res1_i,1'b0);
+	
+	wire [15:0] res2_r = TIEmul(fr[23:16], fr[23:16], 1'b0);
+	wire [15:0] res2_i = TIEmul(fi[23:16], fi[23:16], 1'b0);
+	wire [15:0] res2   = TIEadd(res2_r,res2_i,1'b0);	
+	
+	wire [15:0] res3_r = TIEmul(fr[31:24], fr[31:24], 1'b0);
+	wire [15:0] res3_i = TIEmul(fi[31:24], fi[31:24], 1'b0);
+	wire [15:0] res3   = TIEadd(res3_r,res3_i,1'b0);
+
+	wire [15:0] res4_r = TIEmul(fr[39:32], fr[39:32], 1'b0);
+	wire [15:0] res4_i = TIEmul(fi[39:32], fi[39:32], 1'b0);
+	wire [15:0] res4   = TIEadd(res4_r,res4_i,1'b0);
+		
+	wire [15:0] res5_r = TIEmul(fr[47:40], fr[47:40], 1'b0);
+	wire [15:0] res5_i = TIEmul(fi[47:40], fi[47:40], 1'b0);
+	wire [15:0] res5   = TIEadd(res5_r,res5_i,1'b0);
+	
+	wire [15:0] res6_r = TIEmul(fr[55:48], fr[55:48], 1'b0);
+	wire [15:0] res6_i = TIEmul(fi[55:48], fi[55:48], 1'b0);
+	wire [15:0] res6   = TIEadd(res6_r,res6_i,1'b0);
+	
+	wire [15:0] res7_r = TIEmul(fr[63:56], fr[63:56], 1'b0);
+	wire [15:0] res7_i = TIEmul(fi[63:56], fi[63:56], 1'b0);
+	wire [15:0] res7   = TIEadd(res7_r,res7_i,1'b0);
+		
+	assign data = {res0,res1,res2,res3,res4,res5,res6,res7};
+}
+
+operation SIMD_MUL {in REG_SIMD fr, in REG_SIMD fi, out REG_SIMD val} {}
+{
+	wire [15:0] res1 = 	TIEmul(fr[7:0], fi[7:0], 1'b0);
+	wire [15:0] res2 =  TIEmul(fr[15:8], fi[15:8], 1'b0);
+	wire [15:0] res3 =  TIEmul(fr[23:16], fi[23:16], 1'b0);
+	wire [15:0] res4 =  TIEmul(fr[31:24], fi[31:24], 1'b0);
+	wire [15:0] res5 =  TIEmul(fr[39:32], fi[39:32], 1'b0);
+	wire [15:0] res6 =  TIEmul(fr[47:40], fi[47:40], 1'b0);
+	wire [15:0] res7 =  TIEmul(fr[55:48], fi[55:48], 1'b0);
+	wire [15:0] res8 =  TIEmul(fr[63:56], fi[63:56], 1'b0);
+	
+	assign val  =  {res1,res2,res3,res4,res5,res6,res7,res8}; 
+}
+
+operation SIMD_ADD {in REG_SIMD fr, in REG_SIMD fi, out REG_SIMD val} {}
+{
+	wire [8:0] res1 =  TIEadd(fr[7:0], fi[7:0], 1'b0);
+	wire [8:0] res2 =  TIEadd(fr[15:8], fi[15:8], 1'b0);
+	wire [8:0] res3 =  TIEadd(fr[23:16], fi[23:16], 1'b0);
+	wire [8:0] res4 =  TIEadd(fr[31:24], fi[31:24], 1'b0);
+	wire [8:0] res5 =  TIEadd(fr[39:32], fi[39:32], 1'b0);
+	wire [8:0] res6 =  TIEadd(fr[47:40], fi[47:40], 1'b0);
+	wire [8:0] res7 =  TIEadd(fr[55:48], fi[55:48], 1'b0);
+	wire [8:0] res8 =  TIEadd(fr[63:56], fi[63:56], 1'b0);
+	wire [8:0] res9 =  TIEadd(fr[71:64], fi[71:64], 1'b0);
+	wire [8:0] res10 = TIEadd(fr[79:72], fi[79:72], 1'b0);
+	wire [8:0] res11 = TIEadd(fr[87:80], fi[87:80], 1'b0);
+	wire [8:0] res12 = TIEadd(fr[95:88], fi[95:88], 1'b0);
+	wire [8:0] res13 = TIEadd(fr[103:96], fi[103:96], 1'b0);
+	wire [8:0] res14 = TIEadd(fr[111:104], fi[111:104], 1'b0);
+	wire [8:0] res15 = TIEadd(fr[119:112], fi[119:112], 1'b0);
+	wire [8:0] res16 = TIEadd(fr[127:120], fi[127:120], 1'b0);
+	
+	assign val  =  {res1,res2,res3,res4,res5,res6,res7,res8,res9,res10,res11,res12,res13,res14,res15,res16}; 
+}
+//I didn't add the FLIX related information.
+
+operation SIMD_DYDX {in REG_SIMD fr, out REG_SIMD val} {}
+{
+	wire [8:0] res1 =  TIEadd(fr[7:0]		,~fr[23:16]	 	, 1'b0);
+	wire [8:0] res2 =  TIEadd(fr[15:8]		,~fr[31:24]	 	, 1'b0);
+	wire [8:0] res3 =  TIEadd(fr[23:16]		,~fr[39:32]	 	, 1'b0);
+	wire [8:0] res4 =  TIEadd(fr[31:24]		,~fr[47:40]	 	, 1'b0);
+	wire [8:0] res5 =  TIEadd(fr[39:32]		,~fr[55:48]	 	, 1'b0);
+	wire [8:0] res6 =  TIEadd(fr[47:40]		,~fr[63:56]	 	, 1'b0);
+	wire [8:0] res7 =  TIEadd(fr[55:48]		,~fr[71:64]	 	, 1'b0);
+	wire [8:0] res8 =  TIEadd(fr[63:56]		,~fr[79:72]	 	, 1'b0);
+	wire [8:0] res9 =  TIEadd(fr[71:64]		,~fr[87:80]	 	, 1'b0);
+	wire [8:0] res10 = TIEadd(fr[79:72]		,~fr[95:88]	 	, 1'b0);
+	wire [8:0] res11 = TIEadd(fr[87:80]		,~fr[103:96] 	, 1'b0);
+	wire [8:0] res12 = TIEadd(fr[95:88]		,~fr[111:104] 	, 1'b0);
+	wire [8:0] res13 = TIEadd(fr[103:96]	,~fr[119:112] 	, 1'b0);
+	wire [8:0] res14 = TIEadd(fr[111:104]	,~fr[127:120] 	, 1'b0);
+	wire [8:0] res15 = 8'b0;
+	wire [8:0] res16 = 8'b0;
+	
+	assign val  =  {res1,res2,res3,res4,res5,res6,res7,res8,res9,res10,res11,res12,res13,res14,res15,res16}; 
+}
+
+table atan_table 32 31 {
+	32'b00100000000000000000000000000000,
+	32'b00010010111001000000010100011101,
+	32'b00001001111110110011100001011011,
+	32'b00000101000100010001000111010100,
+	32'b00000010100010110000110101000011,
+	32'b00000001010001011101011111100001,
+	32'b00000000101000101111011000011110,
+	32'b00000000010100010111110001010101,
+	32'b00000000001010001011111001010011,
+	32'b00000000000101000101111100101110,
+	32'b00000000000010100010111110011000,
+	32'b00000000000001010001011111001100,
+	32'b00000000000000101000101111100110,
+	32'b00000000000000010100010111110011,
+	32'b00000000000000001010001011111001,
+	32'b00000000000000000101000101111100,
+	32'b00000000000000000010100010111110,
+	32'b00000000000000000001010001011111,
+	32'b00000000000000000000101000101111,
+	32'b00000000000000000000010100010111,
+	32'b00000000000000000000001010001011,
+	32'b00000000000000000000000101000101,
+	32'b00000000000000000000000010100010,
+	32'b00000000000000000000000001010001,
+	32'b00000000000000000000000000101000,
+	32'b00000000000000000000000000010100,
+	32'b00000000000000000000000000001010,
+	32'b00000000000000000000000000000101,
+	32'b00000000000000000000000000000010,
+	32'b00000000000000000000000000000001,
+	32'b00000000000000000000000000000000
+}
+operation SIMD_CORDIC {in AR angle,in AR XY, out AR val} {}
+{
+
+;for ( $i = 0 ; $i < 16 ; $i++){
+;printf(" wire [16:0] x_%d;", $i);
+;printf(" wire [16:0] y_%d;", $i);
+;printf(" wire [31:0] z_%d;", $i);
+;}	
+	wire [1:0] quadrant;
+	assign quadrant = angle[31:30];
+
+	assign x_0 = (quadrant==2'b00 | quadrant==2'b11) ? XY[15:0] : (quadrant==2'b01) ? ~XY[31:16] : XY[31:16];
+	assign y_0= (quadrant==2'b00 | quadrant==2'b11) ? XY[31:16] : (quadrant==2'b01) ? XY[15:0] : ~XY[15:0];
+	assign z_0 = (quadrant==2'b00 | quadrant==2'b11) ? angle : (quadrant==2'b01) ?  {2'b00,angle[29:0]} : {2'b11,angle[29:0]};
+
+;for ( $i = 0 ; $i < 15 ; $i++){	
+;printf(" assign x_%d = z_%d[31] ? x_%d + (y_%d >>%d) : x_%d - (y_%d >>%d);",$i+1,$i,$i,$i,$i,$i,$i,$i);
+;printf(" assign y_%d = z_%d[31] ? y_%d - (x_%d >>%d) : y_%d + (x_%d >>%d);",$i+1,$i,$i,$i,$i,$i,$i,$i);
+;printf(" assign z_%d = z_%d[31] ? z_%d + atan_table[%d] : z_%d - atan_table[%d];",$i+1,$i,$i,$i,$i,$i);
+;}
+
+	assign val = {x_15,y_15};
+}
+
+operation SIMD_MEDIANFILTER {in REG_SIMD fr, out AR val} {}
+{
+
+	wire [7:0] res1 =  fr[7:0];
+	wire [7:0] res2 =  fr[15:8];
+	wire [7:0] res3 =  fr[23:16];
+	wire [7:0] res4 =  fr[31:24];
+	wire [7:0] res5 =  fr[39:32];
+	wire [7:0] res6 =  fr[47:40];
+	wire [7:0] res7 =  fr[55:48];
+	wire [7:0] res8 =  fr[63:56];
+	wire [7:0] res9 =  fr[71:64];
+	/* Only sort single 3x3 window
+	wire [7:0] res10 = fr[79:72];
+	wire [7:0] res11 = fr[87:80];
+	wire [7:0] res12 = fr[95:88];
+	wire [7:0] res13 = fr[103:96];
+	wire [7:0] res14 = fr[111:104];
+	wire [7:0] res15 = fr[119:112];
+	wire [7:0] res16 = fr[127:120];*/
+	
+	wire [71:0] stage1 = PAIRSORT({res1,res2,res3,res4,res5,res6,res7,res8,res9});
+	wire [71:0] stage2 = PAIRSORT({stage1[71:8],stage1[7:0]});
+	wire [71:0] stage3 = PAIRSORT(stage2);
+	wire [71:0] stage4 = PAIRSORT({stage3[71:8],stage3[7:0]});
+	wire [71:0] stage5 = PAIRSORT(stage4);
+	wire [71:0] stage6 = PAIRSORT({stage5[71:8],stage5[7:0]});
+	wire [71:0] stage7 = PAIRSORT(stage6);
+	wire [71:0] stage8 = PAIRSORT({stage7[71:8],stage7[7:0]});
+	wire [71:0] stage9 = PAIRSORT(stage8);
+	assign val = stage9[39:32];
+}
+
+schedule SIMD_MEDIANFILTER_SCH {SIMD_MEDIANFILTER} {
+ def stage1  1;
+ def stage2  2;
+ def stage3  3;
+ def stage4  4;
+ def stage5  5;
+ def stage6  6;
+ def stage7  7;
+ def stage8  8;
+ def stage9  9;
+ def val 10;
+}
+
+function [71:0] PAIRSORT([71:0] a) slot_shared
+{
+	wire [7:0] res1 =  a[7:0];
+	wire [7:0] res2 =  a[15:8];
+	wire [7:0] res3 =  a[23:16];
+	wire [7:0] res4 =  a[31:24];
+	wire [7:0] res5 =  a[39:32];
+	wire [7:0] res6 =  a[47:40];
+	wire [7:0] res7 =  a[55:48];
+	wire [7:0] res8 =  a[63:56];
+	wire [7:0] res9 =  a[71:64];
+	
+	//{lt1, le1, eq1, ge1, gt1} = 
+	wire lt1 = TIEcmp(res1, res2, 1'b1);
+	wire [7:0] min1 = (lt1 == 1'b1) ? res1 : res2;
+	wire [7:0] max1 = (lt1 == 1'b1) ? res2 : res1;
+	wire lt2 = TIEcmp(res3, res4, 1'b1);
+	wire [7:0] min2 = (lt2 == 1'b1) ? res3 : res4;
+	wire [7:0] max2 = (lt2 == 1'b1) ? res4 : res3;
+	wire lt3 = TIEcmp(res5, res6, 1'b1);
+	wire [7:0] min3 = (lt3 == 1'b1) ? res5 : res6;
+	wire [7:0] max3 = (lt3 == 1'b1) ? res6 : res5;	
+	wire lt4 = TIEcmp(res7, res8, 1'b1);
+	wire [7:0] min4 = (lt4 == 1'b1) ? res7 : res8;
+	wire [7:0] max4 = (lt4 == 1'b1) ? res8 : res7;
+	assign PAIRSORT = {min1,max1,min2,max2,min3,max3,min4,max4,res9};
+}
+operation SIMD_SOBELFILTER {in REG_SIMD fr, out AR dx_val,out AR dy_val} {}
+{
+
+	wire [7:0] in1 =  fr[7:0];
+	wire [7:0] in2 =  fr[15:8];
+	wire [7:0] in3 =  fr[23:16];
+	wire [7:0] in4 =  fr[31:24];
+	wire [7:0] in5 =  fr[39:32];
+	wire [7:0] in6 =  fr[47:40];
+	wire [7:0] in7 =  fr[55:48];
+	wire [7:0] in8 =  fr[63:56];
+	wire [7:0] in9 =  fr[71:64];
+	wire [7:0] in10 = fr[79:72];
+	wire [7:0] in11 = fr[87:80];
+	wire [7:0] in12 = fr[95:88];
+	wire [7:0] in13 = fr[103:96];
+	wire [7:0] in14 = fr[111:104];
+	wire [7:0] in15 = fr[119:112];
+	wire [7:0] in16 = fr[127:120];
+	
+	wire [7:0] dx_res1 = in3-in1 + 2*in7- 2*in5 +in11 - in9;
+	wire [7:0] dx_res2 = in4-in2 + 2*in8- 2*in6 +in12 - in10;
+	wire [7:0] dx_res3 = in7-in5 + 2*in11- 2*in9 +in15 - in13;
+	wire [7:0] dx_res4 = in8-in6 + 2*in12- 2*in10 +in16 - in14;
+	assign dx_val = {dx_res1,dx_res2,dx_res3,dx_res4};
+
+	wire [7:0] dy_res1 = in1-in9 + 2*in2- 2*in10 +in13 - in11;
+	wire [7:0] dy_res2 = in2-in10 + 2*in3- 2*in11 +in4 - in12;
+	wire [7:0] dy_res3 = in5-in13 + 2*in6- 2*in14 +in7 - in15;
+	wire [7:0] dy_res4 = in6-in14 + 2*in7- 2*in15 +in8 - in16;
+	assign dy_val = {dy_res1,dy_res2,dy_res3,dy_res4};
+}
+
+function [31:0] fun111_m1 ([31:0] addr)
+{
+	assign fun111_m1 = addr;	
+}
+
+function [31:0] fun111_m2 ([31:0] addr, [31:0] offset)
+{
+	assign fun111_m2 = addr+offset;
+}
+
+//operation IMG_SUPRESS {in AR gx_gy, in AR *magptr, in AR ncols, in AR m00, out BR edge} {out VAddr, in MemDataIn32}
+operation IMG_SUPRESS {in AR gx_gy, out AR case}{}
+{
+	//wire [2:0] x;
+	
+	wire  a = (gx_gy[15:0] > 16'h0) ? 1'b0 : 1'b1 ;
+	wire  b = (gx_gy[31:16] > 16'h0)? 1'b0 : 1'b1;
+	wire  c = ((gx_gy[15:0] > gx_gy[31:16]) && (gx_gy[31:16] > 16'h0) && (gx_gy[15:0] > 16'h0)) ? 1'b0 : 1'b1;
+	//wire [15:0] xperp = (gx_gy[15:0]/m00);
+	//wire [15:0] yperp = (gx_gy[31:16]/m00);
+	
+	assign case = {a,b,c};
+	
+	//assign VAddr = (x == 3'b000) ? fun111_m1(magptr) : fun111_m2(magptr,ncols);
+	//wire [31:0] data = MemDataIn32;
+	//assign edge = 1'b0;
+}
+
+//I havedoubt
+operation LP_LOAD {in AR *base, in AR offset, out AR data} {out VAddr, in MemDataIn32}
+{
+    assign VAddr = base - offset[30:0];
+	assign data =  MemDataIn32;
+}
+
+operation RP_LOAD {in AR *base, in AR offset, out AR data} {out VAddr, in MemDataIn32}
+{
+    assign VAddr = base + offset[30:0];
+	assign data =  MemDataIn32;
+}
+
+operation HISTOGRAM {in AR *base, in AR img, out AR output} {out VAddr, in MemDataIn16}
+{
+    assign VAddr = base + img;
+	wire [15:0] data =  MemDataIn16;
+	assign output = data+1;
+}
+
+operation NONMAXSUP {in AR *hist, in AR r, inout AR numedges, inout AR maximum_mag} {out VAddr, in MemDataIn32}
+{
+    assign VAddr = hist + r;
+	wire [31:0] data =  MemDataIn32;
+	assign maximum_mag = (data == 0)? maximum_mag : (maximum_mag + r);
+	assign numedges = data+numedges;
+}
+
+operation MAG {in AR delta_x, in AR delta_y, out AR result} {}
+{
+    wire [63:0] o1 = TIEmul(delta_x, delta_x, 1'b0);
+    wire [63:0] o2 = TIEmul(delta_y, delta_y, 1'b0);
+    assign result = o1 + o2 ;
+}
+
+/*schedule HISTOGRAM_SCH {HISTOGRAM} {
+ def stage1  1;
+ def stage2  2;
+}*/
+
+
+//function [7:0] cal_sign(exponent_sum,x_sign,y_sign)
+//{
+//	cal_sign = (exponent_sum[8:7] == 2'b11) ? 1'b0 : (x_sign xor y_sign);
+//}
+
+regfile CI_FLOAT 32 4 fpu
+
+function [22:0] cal_mantissa([8:0] exponent_sum,[47:0] aux2)
+{
+	wire [22:0] t1 = (aux2[47] == 1'b1) ? (aux2[46:24] + {22'b0,aux2[23]}) : (aux2[45:23] + {22'b0,aux2[22]});
+	assign cal_mantissa = (exponent_sum[8] == 1'b1) ? 23'b00000000000000000000000 : t1;
+}
+
+function [7:0] cal_exponent([8:0] exponent_sum)
+{
+	assign cal_exponent = (exponent_sum[8:7] == 2'b10) ? 8'hFF : (exponent_sum[8:7] == 2'b11) ? 8'h00 : exponent_sum[7:0];
+}
+
+function [31:0] FLOAT_MUL_TIE ([31:0] x, [31:0] y)
+{
+	wire [22:0] x_mantissa = x[22:0];
+	wire [7:0] x_exponent = x[30:23];
+	wire x_sign = x[31];
+
+	wire [22:0] y_mantissa = y[22:0];
+	wire [7:0] y_exponent = y[30:23];
+	wire y_sign = y[31];
+	
+	wire [22:0] z_mantissa;
+	wire [7:0] z_exponent;
+	wire z_sign;
+	
+	wire [47:0] aux2 = TIEmul({1'b1 , x_mantissa}, {1'b1 , y_mantissa}, 1'b0);
+	
+	wire aux = aux2[47];
+	
+	wire [8:0] exponent_sum = {1'b0 , x_exponent} + {1'b0 , y_exponent} + {8'b0,aux} - 8'h7F;
+	
+	assign z_exponent = (x_exponent == 8'hFF || y_exponent == 8'hFF) ? 8'hFF : (x_exponent == 8'h0 || y_exponent == 8'h0) ? 8'h0 : cal_exponent(exponent_sum);
+	
+	assign z_mantissa = (x_exponent == 8'hFF || y_exponent == 8'hFF) ? 8'h0 : (x_exponent == 8'h0 || y_exponent == 8'h0) ? 8'h0 : cal_mantissa(exponent_sum,aux2);
+	
+	assign z_sign = (x_exponent == 8'hFF || y_exponent == 8'hFF) ? (x_sign ^ y_sign) : (x_exponent == 8'h0 || y_exponent == 8'h0) ? 1'b0 : (exponent_sum[8:7] == 2'b11) ? 1'b0 : (x_sign ^ y_sign);//cal_sign(exponent_sum,x_sign,y_sign);
+	
+	assign FLOAT_MUL_TIE = {z_sign,z_exponent,z_mantissa};
+}
+operation CI_FLOAT_MUL {in CI_FLOAT x, in CI_FLOAT y, out CI_FLOAT z} {}
+{
+	/*wire [22:0] x_mantissa = x[22:0];
+	wire [7:0] x_exponent = x[30:23];
+	wire x_sign = x[31];
+
+	wire [22:0] y_mantissa = y[22:0];
+	wire [7:0] y_exponent = y[30:23];
+	wire y_sign = y[31];
+	
+	wire [22:0] z_mantissa;
+	wire [7:0] z_exponent;
+	wire z_sign;
+	
+	wire [47:0] aux2 = TIEmul({1'b1 , x_mantissa}, {1'b1 , y_mantissa}, 1'b0);
+	
+	wire aux = aux2[47];
+	
+	wire [8:0] exponent_sum = {1'b0 , x_exponent} + {1'b0 , y_exponent} + {8'b0,aux} - 8'h7F;
+	
+	assign z_exponent = (x_exponent == 8'hFF || y_exponent == 8'hFF) ? 8'hFF : (x_exponent == 8'h0 || y_exponent == 8'h0) ? 8'h0 : cal_exponent(exponent_sum);
+	
+	assign z_mantissa = (x_exponent == 8'hFF || y_exponent == 8'hFF) ? 8'h0 : (x_exponent == 8'h0 || y_exponent == 8'h0) ? 8'h0 : cal_mantissa(exponent_sum,aux2);
+	
+	assign z_sign = (x_exponent == 8'hFF || y_exponent == 8'hFF) ? (x_sign ^ y_sign) : (x_exponent == 8'h0 || y_exponent == 8'h0) ? 1'b0 : (exponent_sum[8:7] == 2'b11) ? 1'b0 : (x_sign ^ y_sign);//cal_sign(exponent_sum,x_sign,y_sign);
+	
+	{z_sign,z_exponent,z_mantissa};*/
+	assign z = FLOAT_MUL_TIE(x,y);
+}
+
+operation CI_FLOAT_LOAD {in AR *base, in AR offset, out CI_FLOAT data} {out VAddr, in MemDataIn32}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = MemDataIn32[7:0];
+    wire [7:0] o2 = MemDataIn32[15:8];
+    wire [7:0] o3 = MemDataIn32[23:16];
+    wire [7:0] o4 = MemDataIn32[31:24];
+    assign data = {o4, o3, o2, o1};
+}
+operation CI_FLOAT_STORE {in AR *base, in AR offset, in CI_FLOAT data} {out VAddr, out MemDataOut32}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = data[7:0];
+    wire [7:0] o2 = data[15:8];
+    wire [7:0] o3 = data[23:16];
+    wire [7:0] o4 = data[31:24];
+
+    assign MemDataOut32 = {o4, o3, o2, o1};
+}
+
+//function [31:0] real_ADD([31:0] flp_a ,[31:0] flp_b)
+/*function [31:0] real_ADD([31:0] A ,[31:0] B)    // http://meseec.ce.rit.edu/eecc250-winter99/250-1-27-2000.pdf
+{
+    wire [31:0] N1,N2, LARGE_NO;
+    wire S_N1, S_N2, S_RESULT;
+    wire [23:0] M_N1, M_N2, M_New;
+    wire [24:0] M_ADD, M_RESULT; //After adding 1 bit will be increase
+    wire [7:0] E_N, E_RESULT;
+    wire [7:0] DIFF_E;
+    wire [5:0] LZD;
+    
+    assign LARGE_NO = ((A[31] == 1'b0)&&(A[31] == 1'b1)) ? A :
+    				  ((A[31] == 1'b1)&&(A[31] == 1'b0)) ? B :
+    				  ((A[31] == B[31])&&(A[30:23] > B[30:23])) ? A :
+    				  ((A[31] == B[31])&&(A[30:23] < B[30:23])) ? B :
+    				  ((A[31:23] == B[31:23]) && (A[22:0] > B[22:0])) ? A : B;
+    
+    assign N1 = LARGE_NO;//(A[30:23] > B[30:23])? A : B;//Large number is N1 and small is N2. Have doubt??
+    assign N2 = (A == LARGE_NO)? B : A;
+    
+    assign DIFF_E =  N1[30:23] - N2[30:23];//No of bits shift to Normalize
+    
+    assign M_N1 = {1'b1, N1[22:0]};//With hidden bit 1.
+    assign M_N2 = {1'b1, N2[22:0]};
+    assign S_N1 = N1[31];
+    assign S_N2 = N2[31];
+    
+    assign E_N = N1[30:23];// the exponent
+    assign M_New = M_N2 >> DIFF_E; //right shift the mantissa including Hidden bit
+    
+    assign M_ADD = (S_N1 ^ S_N2) ? M_N1-M_New : M_New + M_N1;//Add the mantissa including hidden bit 1., if same signs then add else sub
+    
+    //This is not supporting Normalisation steps fully. NO LOD and LZD. Lets see!!
+    // http://www.h-schmidt.net/FloatConverter/IEEE754.html
+    assign LZD = (M_ADD[24 :  0] == 25'b0000000000000000000000000) ? 25 : 
+             (M_ADD[24 :  1] == 24'b000000000000000000000000) ? 24 : 
+             (M_ADD[24 :  2] == 23'b00000000000000000000000) ? 23 :
+             (M_ADD[24 :  3] == 22'b0000000000000000000000) ? 22 :
+             (M_ADD[24 :  4] == 21'b000000000000000000000) ? 21 :
+             (M_ADD[24 :  5] == 20'b00000000000000000000) ? 20 :
+             (M_ADD[24 :  6] == 19'b0000000000000000000) ? 19 :
+             (M_ADD[24 :  7] == 18'b000000000000000000) ? 18 :
+             (M_ADD[24 :  8] == 17'b00000000000000000) ? 17 :
+             (M_ADD[24 :  9] == 16'b0000000000000000) ? 16 :
+             (M_ADD[24 : 10] == 15'b000000000000000) ? 15 :
+             (M_ADD[24 : 11] == 14'b00000000000000) ? 14 :
+             (M_ADD[24 : 12] == 13'b0000000000000) ? 13 :
+             (M_ADD[24 : 13] == 12'b000000000000) ? 12 :
+             (M_ADD[24 : 14] == 11'b00000000000) ? 11 :
+             (M_ADD[24 : 15] == 10'b0000000000) ? 10 :
+             (M_ADD[24 : 16] ==  9'b000000000) ? 9 :
+             (M_ADD[24 : 17] ==  8'b00000000) ? 8 :
+             (M_ADD[24 : 18] ==  7'b0000000) ? 7 :
+             (M_ADD[24 : 19] ==  6'b000000) ? 6 :
+             (M_ADD[24 : 20] ==  5'b00000) ? 5 :
+             (M_ADD[24 : 21] ==  4'b0000) ? 4 :
+             (M_ADD[24 : 22] ==  3'b000) ? 3 :
+             (M_ADD[24 : 23] ==  2'b00) ? 2 :
+             (M_ADD[24] == 1'b0) ? 1 : 0;
+    // For Leading 1 just check 1st bit is enough. For leading zero check all and shift         
+    assign E_RESULT = (M_ADD[24] == 1'b1) ? (E_N+1) : (LZD > 0 ) ? (E_N - (LZD -1)) : E_N;
+    assign M_RESULT = (M_ADD[24] == 1'b1) ?  (M_ADD >> 1) : (LZD > 0 )? M_ADD << (LZD -1) : M_ADD;
+    //assign E_RESULT = (M_ADD[24] == 1'b1) ? (E_N+1) : E_N;
+    //assign M_RESULT = (M_ADD[24] == 1'b1) ?  (M_ADD >> 1) : M_ADD;
+    assign S_RESULT = S_N1;
+    
+    assign real_ADD = {S_RESULT, E_RESULT , M_RESULT[22:0]};
+}*/
+function [31:0] real_ADD([31:0] A ,[31:0] B)    // http://meseec.ce.rit.edu/eecc250-winter99/250-1-27-2000.pdf
+{
+    wire [31:0] N1,N2, LARGE_NO, BIGMAG_NO;
+    wire S_N1, S_N2, S_RESULT;
+    wire [23:0] M_N1, M_N2;
+    wire [24:0] M_ADD, M_RESULT; //After adding 1 bit will be increase
+    wire [7:0] E_N, E_RESULT;
+    wire [7:0] DIFF_E;
+    wire [5:0] LZD;//******
+    
+    assign LARGE_NO = ((A[31] == 1'b0)&&(B[31] == 1'b1)) ? A :
+    				  ((B[31] == 1'b0)&&(A[31] == 1'b1)) ? B :
+    				  ((A[31] == B[31])&&(A[30:23] > B[30:23])) ? A :
+    				  ((A[31] == B[31])&&(A[30:23] < B[30:23])) ? B :
+    				  ((A[31:23] == B[31:23]) && (A[22:0] > B[22:0])) ? A : B;
+    				  
+    assign BIGMAG_NO = 	({(A[30:23]),1'b1,A[22:0]} < {(B[30:23]),1'b1,B[22:0]}) ? B : A ;			  
+    
+    assign N1 = LARGE_NO;//(A[30:23] > B[30:23])? A : B;//Large number is N1 and small is N2. Have doubt??
+    assign N2 = (A == LARGE_NO)? B : A;
+    
+    
+    //assign N1 = (A[30:23] > B[30:23])? A : B;//Large number is N1 and small is N2. Have doubt??
+    //assign N2 = (A[30:23] > B[30:23])? B : A;
+    assign DIFF_E =  (N1[30:23] > N2[30:23]) ? (N1[30:23] - N2[30:23]) : (N2[30:23] - N1[30:23]);//N1[30:23] - N2[30:23];//No of bits shift to Normalize
+    
+    ///assign M_N1 = {1'b1, N1[22:0]};//With hidden bit 1.
+    ///assign M_N2 = {1'b1, N2[22:0]};
+    assign S_N1 = N1[31];
+    assign S_N2 = N2[31];
+    
+    assign E_N = (N1[30:23] > N2[30:23]) ? N1[30:23]:  N2[30:23];// the exponent
+    ///assign M_New = M_N2 >> DIFF_E; //right shift the mantissa including Hidden bit
+    
+    assign M_N1 = (N1[30:23] > N2[30:23]) ? {1'b1, N1[22:0]} : ({1'b1, N1[22:0]} >> DIFF_E);
+    assign M_N2 = (N1[30:23] > N2[30:23]) ? ({1'b1, N2[22:0]} >> DIFF_E) : {1'b1, N2[22:0]};
+    
+    assign M_ADD = (S_N1 == S_N2) ? (M_N1 + M_N2) : (M_N1 > M_N2) ? (M_N1 - M_N2) : (M_N2 - M_N1);//(S_N1 ^ S_N2) ? (M_N1-M_New) : (M_New + M_N1);//Add the mantissa including hidden bit 1., if same signs then add else sub
+    
+    //This is not supporting Normalisation steps fully. NO LOD and LZD. Lets see!!
+    // http://www.h-schmidt.net/FloatConverter/IEEE754.html
+    assign LZD = (M_ADD[24 :  0] == 25'b0000000000000000000000000) ? 25 : 
+             (M_ADD[24 :  1] == 24'b000000000000000000000000) ? 24 : 
+             (M_ADD[24 :  2] == 23'b00000000000000000000000) ? 23 :
+             (M_ADD[24 :  3] == 22'b0000000000000000000000) ? 22 :
+             (M_ADD[24 :  4] == 21'b000000000000000000000) ? 21 :
+             (M_ADD[24 :  5] == 20'b00000000000000000000) ? 20 :
+             (M_ADD[24 :  6] == 19'b0000000000000000000) ? 19 :
+             (M_ADD[24 :  7] == 18'b000000000000000000) ? 18 :
+             (M_ADD[24 :  8] == 17'b00000000000000000) ? 17 :
+             (M_ADD[24 :  9] == 16'b0000000000000000) ? 16 :
+             (M_ADD[24 : 10] == 15'b000000000000000) ? 15 :
+             (M_ADD[24 : 11] == 14'b00000000000000) ? 14 :
+             (M_ADD[24 : 12] == 13'b0000000000000) ? 13 :
+             (M_ADD[24 : 13] == 12'b000000000000) ? 12 :
+             (M_ADD[24 : 14] == 11'b00000000000) ? 11 :
+             (M_ADD[24 : 15] == 10'b0000000000) ? 10 :
+             (M_ADD[24 : 16] ==  9'b000000000) ? 9 :
+             (M_ADD[24 : 17] ==  8'b00000000) ? 8 :
+             (M_ADD[24 : 18] ==  7'b0000000) ? 7 :
+             (M_ADD[24 : 19] ==  6'b000000) ? 6 :
+             (M_ADD[24 : 20] ==  5'b00000) ? 5 :
+             (M_ADD[24 : 21] ==  4'b0000) ? 4 :
+             (M_ADD[24 : 22] ==  3'b000) ? 3 :
+             (M_ADD[24 : 23] ==  2'b00) ? 2 :
+             (M_ADD[24] == 1'b0) ? 1 : 0;
+    
+    assign E_RESULT = (M_ADD[24] == 1'b1) ? (E_N+1) : (LZD > 0 ) ? (E_N - (LZD -1)) : E_N;//**(M_ADD[24] == 1'b1) ? (E_N+1) : E_N;
+    assign M_RESULT = (M_ADD[24] == 1'b1) ?  (M_ADD >> 1) : (LZD > 0 )? M_ADD << (LZD -1) : M_ADD;//**(M_ADD[24] == 1'b1) ?  (M_ADD >> 1) : M_ADD;
+    assign S_RESULT = BIGMAG_NO[31];
+    
+    assign real_ADD = {S_RESULT, E_RESULT , M_RESULT[22:0]};
+}
+
+function [31:0] FLOAT_ADD_TIE ([31:0] A, [31:0] B)
+{	
+  wire       [26:0] a_m, b_m;
+  wire       [9:0] a_e, b_e;
+  wire       a_s, b_s;
+  
+	assign	a_m = {A[22 : 0], 3'd0};
+    assign  b_m = {B[22 : 0], 3'd0};
+    assign  a_e = A[30 : 23] - 127;
+    assign  b_e = B[30 : 23] - 127;
+    assign  a_s = A[31];
+    assign  b_s = B[31];
+    
+    assign FLOAT_ADD_TIE = ((a_e == 128 && a_m != 0) || (b_e == 128 && b_m != 0)) ? 32'b11111111110000000000000000000000 :
+    			(a_e == 128) ? {a_s,8'b11111111,23'b00000000000000000000000} :
+    			(b_e == 128) ? {b_s,8'b11111111,23'b00000000000000000000000} :
+          		(((a_e == 8'b10000001) && (a_m == 0)) && ((b_e == 8'b10000001) && (b_m == 0))) ? {a_s & b_s, b_e[7:0] + 127, b_m[26:3]} : 
+          		((a_e == 8'b10000001) && (a_m == 0)) ? {b_s, b_e[7:0] + 127, b_m[26:3] } :
+          		((b_e == 8'b10000001) && (b_m == 0)) ? {a_s, a_e[7:0] + 127, a_m[26:3] } : real_ADD(A,B);       		
+}
+
+operation CI_FLOAT_ADD {in CI_FLOAT A, in CI_FLOAT B, out CI_FLOAT C} {}
+{	
+  /*wire       [31:0] z;
+  wire       [26:0] a_m, b_m;
+  wire       [9:0] a_e, b_e;
+  wire       a_s, b_s;
+  
+	assign	a_m = {A[22 : 0], 3'd0};
+    assign  b_m = {B[22 : 0], 3'd0};
+    assign  a_e = A[30 : 23] - 127;
+    assign  b_e = B[30 : 23] - 127;
+    assign  a_s = A[31];
+    assign  b_s = B[31];
+    
+    assign z = ((a_e == 128 && a_m != 0) || (b_e == 128 && b_m != 0)) ? 32'b11111111110000000000000000000000 :
+    			(a_e == 128) ? {a_s,8'b11111111,23'b00000000000000000000000} :
+    			(b_e == 128) ? {b_s,8'b11111111,23'b00000000000000000000000} :
+          		(((a_e == 8'b10000001) && (a_m == 0)) && ((b_e == 8'b10000001) && (b_m == 0))) ? {a_s & b_s, b_e[7:0] + 127, b_m[26:3]} : 
+          		((a_e == 8'b10000001) && (a_m == 0)) ? {b_s, b_e[7:0] + 127, b_m[26:3] } :
+          		((b_e == 8'b10000001) && (b_m == 0)) ? {a_s, a_e[7:0] + 127, a_m[26:3] } : real_ADD(A,B);
+  
+  assign C = z;   */
+  assign C = FLOAT_ADD_TIE(A,B);
+}
+
+/*operation Minimum5HW{in AR a, in AR b, in AR c, in AR d, in AR e, out AR result}{}
+{
+   assign result = ((a<=b) && (a<=c) && (a<=d) && (a<=e)) ? 1 :
+   ((b<=c) && (b<=d) && (b<=e)) ? 2 :
+   ((c<=d) && (c<=e)) ? 3 :
+   (d<=e) ? 4 : 5;
+}*/
+operation Minimum4HW{in AR a, in AR b, in AR c, in AR d, out AR result}{}
+{
+    assign result = ((a<=b) && (a<=c) && (a<=d)) ? 1:
+    ((b<=c) && (b<=d)) ? 2 :
+    ((c<=d)) ? 3 : 4;
+}
+
+operation WINDOW_MAC {in AR *base, in REG_SIMD window_coeffi, out REG_SIMD result} {out VAddr, in MemDataIn128}
+{
+    assign VAddr = base;
+
+    wire [31:0] in1 = MemDataIn128[31:0];
+    wire [31:0] in2 = MemDataIn128[63:32];
+    wire [31:0] in3 = MemDataIn128[95:64];
+    wire [31:0] in4 = MemDataIn128[127:96];
+    
+    wire [31:0] W1 = window_coeffi[31:0];
+    wire [31:0] W2 = window_coeffi[63:32];
+	wire [31:0] W3 = window_coeffi[95:64];
+	//wire [31:0] W4 = window_coeffi[127:96];
+	
+	wire [31:0] mul1_1 = FLOAT_MUL_TIE(in1,W1);
+	wire [31:0] mul1_2 = FLOAT_MUL_TIE(in2,W2);
+	wire [31:0] mul1_3 = FLOAT_MUL_TIE(in3,W3);
+	
+	wire [31:0] mul2_1 = FLOAT_MUL_TIE(in2,W1);
+	wire [31:0] mul2_2 = FLOAT_MUL_TIE(in3,W2);
+	wire [31:0] mul2_3 = FLOAT_MUL_TIE(in4,W3);
+	
+	wire [31:0] add1 = FLOAT_ADD_TIE(mul1_1,mul1_2);
+	wire [31:0] add1_f = FLOAT_ADD_TIE(add1,mul1_3);
+	
+	wire [31:0] add2 = FLOAT_ADD_TIE(mul2_1,mul2_2);
+	wire [31:0] add2_f = FLOAT_ADD_TIE(add2,mul2_3);
+	
+	assign result = {32'b0, add1_f,32'b0, add2_f};
+	
+}

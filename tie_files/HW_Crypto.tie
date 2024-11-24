@@ -1,0 +1,385 @@
+regfile REG_SIMD 128 4 sv
+regfile REG_SHA 64 25 stvec
+function [31:0] ADD32([31:0] a, [15:0] b) slot_shared
+{
+    assign ADD32 = TIEadd(a, b, 1'b0);
+}
+//For AES
+operation HW_LOAD {in AR *base, in AR offset, out REG_SIMD data} {out VAddr, in MemDataIn128}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = MemDataIn128[7:0];
+    wire [7:0] o2 = MemDataIn128[15:8];
+    wire [7:0] o3 = MemDataIn128[23:16];
+    wire [7:0] o4 = MemDataIn128[31:24];
+    wire [7:0] o5 = MemDataIn128[39:32];
+    wire [7:0] o6 = MemDataIn128[47:40];
+    wire [7:0] o7 = MemDataIn128[55:48];
+    wire [7:0] o8 = MemDataIn128[63:56];
+	wire [7:0] o9 = MemDataIn128[71:64];
+	wire [7:0] o10 = MemDataIn128[79:72];
+	wire [7:0] o11 = MemDataIn128[87:80];
+	wire [7:0] o12 = MemDataIn128[95:88];
+	wire [7:0] o13 = MemDataIn128[103:96];
+	wire [7:0] o14 = MemDataIn128[111:104];
+	wire [7:0] o15 = MemDataIn128[119:112];
+	wire [7:0] o16 = MemDataIn128[127:120];
+   assign data = {o16, o15, o14, o13, o12, o11, o10, o9 ,o8, o7, o6, o5, o4, o3, o2, o1};// assign data = {o1, o2, o3, o4, o5, o6, o7, o8 ,o9, o10, o11, o12, o13, o14, o15, o16};
+}
+
+operation HW_STORE {in AR *base, in AR offset, in REG_SIMD data} {out VAddr, out MemDataOut128}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = data[7:0];
+    wire [7:0] o5 = data[15:8];
+    wire [7:0] o9 = data[23:16];
+    wire [7:0] o13 = data[31:24];
+    wire [7:0] o2 = data[39:32];
+    wire [7:0] o6 = data[47:40];
+    wire [7:0] o10 = data[55:48];
+    wire [7:0] o14 = data[63:56];
+    wire [7:0] o3 = data[71:64];
+    wire [7:0] o7 = data[79:72];
+    wire [7:0] o11 = data[87:80];
+    wire [7:0] o15 = data[95:88];
+    wire [7:0] o4 = data[103:96];
+    wire [7:0] o8 = data[111:104];
+    wire [7:0] o12 = data[119:112];
+    wire [7:0] o16 = data[127:120];
+	assign MemDataOut128 = {o16, o15, o14, o13, o12, o11, o10, o9 ,o8, o7, o6, o5, o4, o3, o2, o1}; //assign MemDataOut128 = {o1, o2, o3, o4, o5, o6, o7, o8 ,o9, o10, o11, o12, o13, o14, o15, o16};
+}
+
+operation HW_SHIFTROW {in AR *base, in AR offset, in REG_SIMD data} {out VAddr, out MemDataOut128}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = data[7:0];
+    wire [7:0] o2 = data[15:8];
+    wire [7:0] o3 = data[23:16];
+    wire [7:0] o4 = data[31:24];
+    wire [7:0] o5 = data[39:32];
+    wire [7:0] o6 = data[47:40];
+    wire [7:0] o7 = data[55:48];
+    wire [7:0] o8 = data[63:56];
+    wire [7:0] o9 = data[71:64];
+    wire [7:0] o10 = data[79:72];
+    wire [7:0] o11 = data[87:80];
+    wire [7:0] o12 = data[95:88];
+    wire [7:0] o13 = data[103:96];
+    wire [7:0] o14 = data[111:104];
+    wire [7:0] o15 = data[119:112];
+    wire [7:0] o16 = data[127:120];
+
+    assign MemDataOut128 = {o2, o3, o4, o1, o6, o7, o8, o5 ,o10, o11, o12, o9, o14, o15, o16, o13};
+}
+//AES : xor_buf 64 bit enough??
+operation HW_XOR {in REG_SIMD data1, in REG_SIMD data2, out REG_SIMD dataO}{}
+{
+    wire [127:0] result = data1 ^ data2;
+    assign dataO = result;
+}
+//SHA-3
+
+operation SHA3_XOR {in REG_SHA data1, in REG_SHA data2, out REG_SHA dataO}{}
+{
+    wire [63:0] result = data1 ^ data2;
+    assign dataO = result;
+}
+
+table RhoPi 32 25 {0,36,3,41,18,
+					1,44,10,45,2,
+					62,6,43,15,61,
+					28,55,25,21,56,
+					27,20,39,8,14}
+
+
+operation ROTLEFT64 {in REG_SHA input, out REG_SHA output} {}
+{
+    wire [63:0] result1 =  ((input << 1) | (input >> 63));
+	assign output= result1;
+}
+operation SHA3_RPSHIFT { in REG_SHA X, in AR idx, out REG_SHA y }{}
+{
+	wire [63:0] result1 =  ((X << RhoPi[idx]) | (X >> (64 - RhoPi[idx])));
+	assign y= result1;
+}
+
+/*queue INPQ 320 in
+queue OUTQ 64 out
+regfile qbuffer 64 5 qb
+operation READ_Q {out qbuffer buffer}{in INPQ}{assign buffer = INPQ;}
+operation SHA3_5XOR {in qbuffer buffer}{out OUTQ}
+{
+	wire [63:0] data0 = buffer[63:0];
+	wire [63:0] data1 = buffer[127:64];
+	wire [63:0] data2 = buffer[195:128];
+	wire [63:0] data3 = buffer[255:196];
+	wire [63:0] data4 = buffer[319:256];
+	wire [63:0] result = data0 ^ data1 ^ data2 ^ data3 ^ data4;
+	assign OUTQ = result;
+}*/
+//schedule streamin { SHA3_5XOR } { def X 3; }
+
+operation SHA3_LOAD {in AR *base, in AR offset, out REG_SHA data} {out VAddr, in MemDataIn64}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = MemDataIn64[7:0];
+    wire [7:0] o2 = MemDataIn64[15:8];
+    wire [7:0] o3 = MemDataIn64[23:16];
+    wire [7:0] o4 = MemDataIn64[31:24];
+    wire [7:0] o5 = MemDataIn64[39:32];
+    wire [7:0] o6 = MemDataIn64[47:40];
+    wire [7:0] o7 = MemDataIn64[55:48];
+    wire [7:0] o8 = MemDataIn64[63:56];
+    assign data = {o1, o2, o3, o4, o5, o6, o7, o8};
+}
+operation SHA3_COMPLIMENT {in REG_SHA data1, out REG_SHA dataO}{}
+{
+    //wire [63:0] result = ~data2;
+    assign dataO = ~data1;
+}
+//queue INPQ 32 in
+//regfile qbuffer 32 25 qb
+
+//operation READ_Q {out qbuffer buffer}{in INPQ}{assign buffer = INPQ;}
+
+
+operation SHA1_SHIFT {in AR *base, out AR output} {out VAddr, in MemDataIn32}
+{
+    assign VAddr = base;//ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = MemDataIn32[7:0];
+    wire [7:0] o2 = MemDataIn32[15:8];
+    wire [7:0] o3 = MemDataIn32[23:16];
+    wire [7:0] o4 = MemDataIn32[31:24];
+
+    assign output = {o1, o2, o3, o4};
+}
+/*function [31:0] mod_tie ([31:0] a, [31:0] b)
+{
+	wire [31:0] ret = a % b;
+	assign mod_tie = (ret < 0) ? TIEadd(ret,b,1'b0) : ret;
+}
+operation SHA3_MOD {in AR a,in AR b, out AR output} {out VAddr, in MemDataIn32}
+{
+	wire [31:0] a_f = (b < 0) ? -a : a;
+	wire [31:0] b_f = (b < 0) ? -b : b;
+    assign output = mod_tie(a_f,b_f);
+}*/
+
+function [31:0] rotleft ([31:0] data, [31:0] shift)
+{
+	assign rotleft = ((data << shift) | (data >> 32-shift));
+}
+function [31:0] rotright ([31:0] data, [31:0] shift)
+{
+	assign rotright = ((data >> shift) | (data << 32-shift));
+}
+
+operation ROTLEFT {in AR input, in AR shift, out AR output} {}
+{
+    assign  output = rotleft (input, shift);
+}
+
+operation ROTRIGHT {in AR input, in AR shift, out AR output} {}
+{
+    assign  output = rotright (input, shift);
+}
+
+operation SHA256_CH {in AR x, in AR y, in AR z, out AR result} {}
+{
+    assign  result = (((x) & (y)) ^ (~(x) & (z)));
+}
+
+operation SHA256_MAJ {in AR x, in AR y, in AR z, out AR result} {}
+{
+    assign  result = (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)));
+}
+
+operation SHA1_5SHIFT_1 {in AR m, in AR ctx_k, inout REG_SIMD output, inout AR e} {}
+{
+    wire [31:0] a = output[31:0];
+    wire [31:0] b = output[63:32];
+    wire [31:0] c = output[95:64];
+    wire [31:0] d = output[127:96];
+    
+	//wire [15:0] t1 = TIErotleft(a, 5);
+	wire [31:0] t = rotleft(a, 5) + ((b & c) ^ (~b & d)) + e + ctx_k + m;
+	wire [31:0] e1 = d;
+	wire [31:0] d1 = c;
+	wire [31:0] c1 = rotleft(b, 30);
+	wire [31:0] b1 = a;
+	wire [31:0] a1 = t;
+	
+	assign output = {d1,c1,b1,a1};
+	assign e = e1;
+}
+
+operation SHA1_5SHIFT_2 {in AR m, in AR ctx_k, inout REG_SIMD output, inout AR e} {}
+{
+    wire [31:0] a = output[31:0];
+    wire [31:0] b = output[63:32];
+    wire [31:0] c = output[95:64];
+    wire [31:0] d = output[127:96];
+    
+	//wire [15:0] t1 = TIErotleft(a, 5);
+	wire [31:0] t = rotleft(a, 5) + (b ^ c ^ d) + e + ctx_k + m;
+	wire [31:0] e1 = d;
+	wire [31:0] d1 = c;
+	wire [31:0] c1 = rotleft(b, 30);
+	wire [31:0] b1 = a;
+	wire [31:0] a1 = t;
+	
+	assign output = {d1,c1,b1,a1};
+	assign e = e1;
+}
+
+operation SHA1_5SHIFT_3 {in AR m, in AR ctx_k, inout REG_SIMD output, inout AR e} {}
+{
+    wire [31:0] a = output[31:0];
+    wire [31:0] b = output[63:32];
+    wire [31:0] c = output[95:64];
+    wire [31:0] d = output[127:96];
+    
+	//wire [15:0] t1 = TIErotleft(a, 5);
+	wire [31:0] t = rotleft(a, 5) + ((b & c) ^ (b & d) ^ (c & d)) + e + ctx_k + m;
+	wire [31:0] e1 = d;
+	wire [31:0] d1 = c;
+	wire [31:0] c1 = rotleft(b, 30);
+	wire [31:0] b1 = a;
+	wire [31:0] a1 = t;
+	
+	assign output = {d1,c1,b1,a1};
+	assign e = e1;
+}
+
+operation SHA1_ADD {in AR *ctx_state,in REG_SIMD input, out REG_SIMD output}{out VAddr, in MemDataIn128}
+{
+	assign VAddr = ctx_state;
+    wire [31:0] o1 = input[31:0] + MemDataIn128[31:0];
+    wire [31:0] o2 = input[63:32] + MemDataIn128[63:32];
+    wire [31:0] o3 = input[95:64] + MemDataIn128[95:64];
+    wire [31:0] o4 = input[127:96] + MemDataIn128[127:96];
+	    
+	assign output = {o4,o3,o2,o1};
+}
+
+operation SHA1_REVERSE {in AR *ctx_state, out REG_SIMD hash}{out VAddr, in MemDataIn128}
+{
+		assign VAddr = ctx_state;
+	    wire [7:0] o1 = MemDataIn128[7:0];
+	    wire [7:0] o2 = MemDataIn128[15:8];
+	    wire [7:0] o3 = MemDataIn128[23:16];
+	    wire [7:0] o4 = MemDataIn128[31:24];
+	    wire [7:0] o5 = MemDataIn128[39:32];
+	    wire [7:0] o6 = MemDataIn128[47:40];
+	    wire [7:0] o7 = MemDataIn128[55:48];
+	    wire [7:0] o8 = MemDataIn128[63:56];
+	    wire [7:0] o9 = MemDataIn128[71:64];
+	    wire [7:0] o10 = MemDataIn128[79:72];
+	    wire [7:0] o11 = MemDataIn128[87:80];
+	    wire [7:0] o12 = MemDataIn128[95:88];
+	    wire [7:0] o13 = MemDataIn128[103:96];
+	    wire [7:0] o14 = MemDataIn128[111:104];
+	    wire [7:0] o15 = MemDataIn128[119:112];
+	    wire [7:0] o16 = MemDataIn128[127:120];
+		
+		//assign hash = {o4,o3,o2,o1,o8,o7,o6,o5,o12,o11,o10,o9,o16,o15,o14,o13};
+		assign hash = {o16,o15,o14,o13,o12,o11,o10,o9,o8,o7,o6,o5,o4,o3,o2,o1};
+}
+
+operation SHA256_EP0 {in AR x, out AR y}{}
+{
+    wire [31:0] o1 = rotright(x,2);
+    wire [31:0] o2 = rotright(x,13);
+    wire [31:0] o3 = rotright(x,22);
+    wire [31:0] o4 = o1 ^ o2 ^ o3;
+	    
+	assign y = o4;
+}
+operation SHA256_EP1 {in AR x, out AR y}{}
+{
+    wire [31:0] o1 = rotright(x,6);
+    wire [31:0] o2 = rotright(x,11);
+    wire [31:0] o3 = rotright(x,25);
+    wire [31:0] o4 = o1 ^ o2 ^ o3;
+	    
+	assign y = o4;
+}
+operation SHA256_SIG0 {in AR x, out AR y}{}
+{
+    wire [31:0] o1 = rotright(x,7);
+    wire [31:0] o2 = rotright(x,18);
+    wire [31:0] o3 = x >> 3;
+    wire [31:0] o4 = o1 ^ o2 ^ o3;
+	    
+	assign y = o4;
+}
+operation SHA256_SIG1 {in AR x, out AR y}{}
+{
+    wire [31:0] o1 = rotright(x,17);
+    wire [31:0] o2 = rotright(x,19);
+    wire [31:0] o3 = x >> 10;
+    wire [31:0] o4 = o1 ^ o2 ^ o3;
+	    
+	assign y = o4;
+}
+function [31:0] ch_tie ([31:0] x, [31:0] y,[31:0] z)
+{
+	assign ch_tie = (((x) & (y)) ^ (~(x) & (z)));
+}
+function [31:0] EP0_tie ([31:0] x)
+{
+	wire [31:0] o1 = rotright(x,2);
+    wire [31:0] o2 = rotright(x,13);
+    wire [31:0] o3 = rotright(x,22);
+    wire [31:0] o4 = o1 ^ o2 ^ o3;
+	assign EP0_tie = o4;
+}
+function [31:0] EP1_tie ([31:0] x)
+{
+    wire [31:0] o1 = rotright(x,6);
+    wire [31:0] o2 = rotright(x,11);
+    wire [31:0] o3 = rotright(x,25);
+    wire [31:0] o4 = o1 ^ o2 ^ o3;
+	assign EP1_tie = o4;
+}
+function [31:0] MAJ_tie ([31:0] x, [31:0] y,[31:0] z)
+{
+	assign MAJ_tie = (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)));
+}
+operation SHA256_4SHIFT_2 {inout REG_SIMD abcd, in AR t1} {}
+{
+	wire [31:0] a = abcd[31:0];
+    wire [31:0] b = abcd[63:32];
+    wire [31:0] c = abcd[95:64];
+    //wire [31:0] d = abcd[127:96];
+    
+    wire [31:0]	t2 = EP0_tie(a) + MAJ_tie(a,b,c);
+    
+	wire [31:0]	d1 = c;
+	wire [31:0]	c1 = b;
+	wire [31:0]	b1 = a;
+	wire [31:0]	a1 = t1 + t2;
+	
+	assign abcd = {d1,c1,b1,a1};
+}
+
+operation SHA256_4SHIFT_1 {in AR m, in AR k, inout REG_SIMD efgh, inout AR d_t1} {}
+{
+	wire [31:0] e = efgh[31:0];
+    wire [31:0] f = efgh[63:32];
+    wire [31:0] g = efgh[95:64];
+    wire [31:0] h = efgh[127:96];
+	wire [31:0] T_t1 = h + EP1_tie(e) + ch_tie(e,f,g) + k + m;
+	wire [31:0]	h1 = g;
+	wire [31:0]	g1 = f;
+	wire [31:0]	f1 = e;
+	wire [31:0]	e1 = d_t1 + T_t1;
+	
+	assign efgh = {h1,g1,f1,e1};
+	assign d_t1 = T_t1;
+}

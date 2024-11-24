@@ -1,0 +1,51 @@
+regfile REG_SIMD 128 4 sv
+function [31:0] ADD32([31:0] a, [15:0] b) slot_shared
+{
+    assign ADD32 = TIEadd(a, b, 1'b0);
+}
+operation HW_LOAD {in AR *base, in AR offset, out REG_SIMD data} {out VAddr, in MemDataIn128}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = MemDataIn128[7:0];
+    wire [7:0] o2 = MemDataIn128[15:8];
+    wire [7:0] o3 = MemDataIn128[23:16];
+    wire [7:0] o4 = MemDataIn128[31:24];
+    wire [7:0] o5 = MemDataIn128[39:32];
+    wire [7:0] o6 = MemDataIn128[47:40];
+    wire [7:0] o7 = MemDataIn128[55:48];
+    wire [7:0] o8 = MemDataIn128[63:56];
+	wire [7:0] o9 = MemDataIn128[71:64];
+	wire [7:0] o10 = MemDataIn128[79:72];
+	wire [7:0] o11 = MemDataIn128[87:80];
+	wire [7:0] o12 = MemDataIn128[95:88];
+	wire [7:0] o13 = MemDataIn128[103:96];
+	wire [7:0] o14 = MemDataIn128[111:104];
+	wire [7:0] o15 = MemDataIn128[119:112];
+	wire [7:0] o16 = MemDataIn128[127:120];
+    assign data = {o1, o2, o3, o4, o5, o6, o7, o8 ,o9, o10, o11, o12, o13, o14, o15, o16};
+}
+
+operation HW_STORE {in AR *base, in AR offset, in REG_SIMD data} {out VAddr, out MemDataOut128}
+{
+    assign VAddr = ADD32(base, {offset[30:0], 1'b0});
+
+    wire [7:0] o1 = data[7:0];
+    wire [7:0] o2 = data[15:8];
+    wire [7:0] o3 = data[23:16];
+    wire [7:0] o4 = data[31:24];
+    wire [7:0] o5 = data[39:32];
+    wire [7:0] o6 = data[47:40];
+    wire [7:0] o7 = data[55:48];
+    wire [7:0] o8 = data[63:56];
+    wire [7:0] o9 = data[71:64];
+    wire [7:0] o10 = data[79:72];
+    wire [7:0] o11 = data[87:80];
+    wire [7:0] o12 = data[95:88];
+    wire [7:0] o13 = data[103:96];
+    wire [7:0] o14 = data[111:104];
+    wire [7:0] o15 = data[119:112];
+    wire [7:0] o16 = data[127:120];
+
+    assign MemDataOut128 = {o1, o2, o3, o4, o5, o6, o7, o8 ,o9, o10, o11, o12, o13, o14, o15, o16};
+}

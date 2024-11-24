@@ -1,0 +1,8 @@
+#
+#Fri Mar 25 08:44:11 SGT 2016
+com.tensilica.xide.cdtcommandlist=
+org.eclipse.cdt.launch.WORKING_DIRECTORY=
+com.tensilica.xide.cdtrunscriptafterload=false
+com.tensilica.xide.cdt.launch.attachingdo=resume and stop in main
+org.eclipse.cdt.launch.PROGRAM_ARGUMENTS=C\:\\usr\\xtensa\\Xplorer-6.0.2-workspaces\\workspace\\canny\\bin\\D_570T\\Debug\\fp_whole.pgm 2 0.5 0.5
+com.tensilica.xide.cdt.launch.attachingdo.stop.at.symbol=main

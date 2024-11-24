@@ -1,0 +1,4 @@
+operation ADD3 {inout AR res, in AR in0, in AR in1} {} {
+   assign res = res + in0 + in1;
+}
+
